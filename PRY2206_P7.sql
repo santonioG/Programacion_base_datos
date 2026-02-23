@@ -1,24 +1,17 @@
 
 -- =============================================================================
 -- ACTIVIDAD FORMATIVA SEMANA 7 - PRY2206 Programación de Bases de Datos
--- Caso: Clínica MAXSALUD
--- Tema: Packages, Funciones Almacenadas y Procedimientos Almacenados
 -- =============================================================================
 
--- =============================================================================
--- PASO 1: CREACIÓN DEL TYPE VARRAY para multas por día de atraso
--- Se definen 7 especialidades con sus montos de multa según Tabla 1 del enunciado
--- =============================================================================
+-- PASO 1: 
+
 CREATE OR REPLACE TYPE t_multas_especialidad AS VARRAY(7) OF NUMBER(6);
 /
 
 -- =============================================================================
--- PASO 2: ESPECIFICACIÓN DEL PACKAGE PKG_CLINICA_MAXSALUD
--- Contiene 3 constructores públicos:
---   1. Función: obtener el valor de descuento para pacientes mayores de 70 años
---   2. Variable pública: almacenar el valor de la multa
---   3. Variable pública: almacenar el valor de descuento para 3ra edad
+-- PASO 2: 
 -- =============================================================================
+
 CREATE OR REPLACE PACKAGE PKG_CLINICA_MAXSALUD AS
 
     -- Variable pública para almacenar el valor de la multa calculada
@@ -29,9 +22,7 @@ CREATE OR REPLACE PACKAGE PKG_CLINICA_MAXSALUD AS
 
     -- Función pública: retorna el valor de descuento para pacientes > 70 años
     -- Parámetros:
-    --   p_edad      : edad del paciente a la fecha de la atención médica
-    --   p_monto     : monto de la multa antes del descuento
-    -- Retorna: monto del descuento a aplicar (0 si no aplica)
+
     FUNCTION f_descto_3ra_edad(
         p_edad  IN NUMBER,
         p_monto IN NUMBER
@@ -41,9 +32,9 @@ END PKG_CLINICA_MAXSALUD;
 /
 
 -- =============================================================================
--- PASO 3: CUERPO DEL PACKAGE PKG_CLINICA_MAXSALUD
--- Implementación de la función de descuento para 3ra edad
+-- PASO 3:
 -- =============================================================================
+
 CREATE OR REPLACE PACKAGE BODY PKG_CLINICA_MAXSALUD AS
 
     -- Implementación de la función de descuento para pacientes > 70 años
@@ -85,11 +76,9 @@ END PKG_CLINICA_MAXSALUD;
 /
 
 -- =============================================================================
--- PASO 4: FUNCIÓN ALMACENADA f_get_especialidad
--- Obtiene el nombre de la especialidad de la atención médica
--- Parámetro: p_ate_id -> ID de la atención médica
--- Retorna: nombre de la especialidad (VARCHAR2)
+-- PASO 4:
 -- =============================================================================
+
 CREATE OR REPLACE FUNCTION f_get_especialidad(
     p_ate_id IN ATENCION.ate_id%TYPE
 ) RETURN VARCHAR2 IS
@@ -116,19 +105,9 @@ END f_get_especialidad;
 /
 
 -- =============================================================================
--- PASO 5: PROCEDIMIENTO ALMACENADO sp_genera_pago_moroso
--- Genera la información de todas las atenciones médicas pagadas fuera de plazo
--- el año ANTERIOR al año de ejecución del proceso.
---
--- Lógica:
---   - Busca pagos donde fecha_pago > fecha_venc_pago (pago tardío)
---   - Filtra el año anterior usando funciones de fecha (no fechas fijas)
---   - Calcula días de morosidad = fecha_pago - fecha_venc_pago
---   - Calcula multa usando VARRAY indexado por especialidad
---   - Aplica descuento si paciente tenía > 70 años a la fecha de atención
---   - Almacena resultados en tabla PAGO_MOROSO ordenados por fecha_venc_pago
---     y apellido paterno del paciente
+-- PASO 5: 
 -- =============================================================================
+
 CREATE OR REPLACE PROCEDURE sp_genera_pago_moroso AS
 
     -- -------------------------------------------------------------------
@@ -141,6 +120,7 @@ CREATE OR REPLACE PROCEDURE sp_genera_pago_moroso AS
     -- Índice 6: Ginecología y Gast -> $2.000
     -- Índice 7: Dermatología       -> $2.300
     -- -------------------------------------------------------------------
+    
     v_multas    t_multas_especialidad := t_multas_especialidad(1200, 1300, 1700, 1900, 1100, 2000, 2300);
 
     -- Variable para el índice del VARRAY según la especialidad
@@ -168,6 +148,7 @@ CREATE OR REPLACE PROCEDURE sp_genera_pago_moroso AS
     -- Se usa EXTRACT(YEAR FROM ...) para obtener el año en forma dinámica
     -- Se ordena por fecha_venc_pago ASC y apellido paterno ASC
     -- -------------------------------------------------------------------
+    
     CURSOR cur_morosos IS
         SELECT
             P.pac_run,
@@ -197,11 +178,13 @@ BEGIN
     -- Truncar la tabla PAGO_MOROSO antes de poblarla
     -- Se utiliza EXECUTE IMMEDIATE para ejecutar DDL dentro de PL/SQL
     -- -------------------------------------------------------------------
+    
     EXECUTE IMMEDIATE 'TRUNCATE TABLE PAGO_MOROSO';
 
     -- -------------------------------------------------------------------
     -- Iterar sobre cada atención morosa del año anterior
     -- -------------------------------------------------------------------
+    
     FOR rec IN cur_morosos LOOP
 
         -- Obtener la especialidad usando la Función Almacenada f_get_especialidad
@@ -211,12 +194,6 @@ BEGIN
         v_costo_atencion := rec.costo_atencion;
 
         -- -------------------------------------------------------------------
-        -- Determinar el índice del VARRAY según la especialidad del médico
-        -- usando Estructuras de Control Condicionales (IF-ELSIF)
-        -- Especialidades cargadas en BD:
-        --   100=Traumatología, 200=Gastroenterología, 300=Neurología,
-        --   400=Geriatría, 500=Oftalmología, 600=Pediatría,
-        --   700=Medicina General, 800=Ginecología, 900=Dermatología
         -- Multas según Tabla 1 del enunciado:
         --   Medicina General        -> idx 1 -> $1.200
         --   Traumatología           -> idx 2 -> $1.300
@@ -226,6 +203,7 @@ BEGIN
         --   Ginecología y Gastro.   -> idx 6 -> $2.000
         --   Dermatología            -> idx 7 -> $2.300
         -- -------------------------------------------------------------------
+        
         IF v_esp_id = 700 THEN
             -- Medicina General
             v_idx_varray := 1;
@@ -257,18 +235,21 @@ BEGIN
         -- Multa = días de morosidad * valor_multa_por_día (del VARRAY)
         -- Se asigna al mismo tiempo a la variable pública del Package
         -- -------------------------------------------------------------------
+        
         PKG_CLINICA_MAXSALUD.v_monto_multa := v_dias_morosidad * v_multas(v_idx_varray);
 
         -- -------------------------------------------------------------------
         -- Calcular la edad del paciente a la fecha de la atención médica
         -- Usando MONTHS_BETWEEN para obtener años exactos a la fecha de atención
         -- -------------------------------------------------------------------
+        
         v_edad_atencion := TRUNC(MONTHS_BETWEEN(rec.fecha_atencion, rec.fecha_nacimiento) / 12);
 
         -- -------------------------------------------------------------------
         -- Verificar si aplica descuento por 3ra edad (más de 70 años)
         -- Se usa la función pública del Package
         -- -------------------------------------------------------------------
+        
         IF v_edad_atencion > 70 THEN
             -- Llamar a la función del Package para obtener el valor del descuento
             v_descuento := PKG_CLINICA_MAXSALUD.f_descto_3ra_edad(
@@ -339,8 +320,8 @@ END sp_genera_pago_moroso;
 
 -- =============================================================================
 -- PASO 6: EJECUCIÓN DEL PROCEDIMIENTO
--- Llamada al procedimiento almacenado para generar la información de morosos
 -- =============================================================================
+
 SET SERVEROUTPUT ON;
 
 BEGIN
@@ -350,9 +331,8 @@ END;
 
 -- =============================================================================
 -- PASO 7: CONSULTA DE VERIFICACIÓN
--- Verificar que la tabla PAGO_MOROSO tiene los datos correctos,
--- ordenados por fecha_venc_pago ASC y pac_nombre ASC (apellido paterno)
 -- =============================================================================
+
 SELECT
     pac_run,
     pac_dv_run,
